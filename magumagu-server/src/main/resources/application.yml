@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: magumagu
+
+ai:
+  nvidia:
+    api-key: ${NVIDIA_API_KEY}
