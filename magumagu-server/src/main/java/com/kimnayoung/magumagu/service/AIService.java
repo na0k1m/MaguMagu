@@ -23,7 +23,8 @@ public class AiService {
         this.objectMapper = new ObjectMapper();
     }
 
-    public AiParsedResultDto testVisionApi() {
+//     public AiParsedResultDto testVisionApi() {
+    public AiParsedResultDto analyzeData(String userText, String imageUrl) {
         String systemPrompt = """
                 너는 사용자의 무질서한 텍스트 메모, 링크, 이미지를 완벽하게 분석하고 체계적으로 분류하는 서비스의 핵심 AI 비서야.
                 사용자가 데이터를 입력하면, 반드시 아래의 규칙을 준수하여 오직 JSON 형식으로만 응답해야 해. JSON 외에 어떠한 부가적인 설명이나 인사말도 절대 출력하지 마.
@@ -56,28 +57,32 @@ public class AiService {
                 .role("system")
                 .content(List.of(systemContent))
                 .build();
+
+        java.util.List<AiRequestDto.Content> userContents = new java.util.ArrayList<>();
+
+        // 텍스트 추가
+        if (userText != null && !userText.trim().isEmpty()) {
+            userContents.add(AiRequestDto.Content.builder()
+                    .type("text")
+                    .text(userText)
+                    .build());
+        }
         
-        // 1. DTO 조립: 텍스트 내용 세팅
-        AiRequestDto.Content textContent = AiRequestDto.Content.builder()
-                .type("text")
-                .text("이 사진에 무엇이 있는지 간단히 한글로 설명해 줘.")
-                .build();
+        // 이미지 URL 추가
+        if (imageUrl != null && !imageUrl.trim().isEmpty()) {
+            userContents.add(AiRequestDto.Content.builder()
+                    .type("image_url")
+                    .image_url(AiRequestDto.ImageUrl.builder().url(imageUrl).build())
+                    .build());
+        }
 
-        // 2. DTO 조립: 이미지 URL 세팅
-        AiRequestDto.Content imageContent = AiRequestDto.Content.builder()
-                .type("image_url")
-                .image_url(AiRequestDto.ImageUrl.builder()
-                        .url("https://picsum.photos/id/237/400/300")
-                        .build())
-                .build();
-
-        // 3. 메시지 묶기
+        // 메시지 묶기
         AiRequestDto.Message userMessage = AiRequestDto.Message.builder()
                 .role("user")
-                .content(List.of(textContent, imageContent))
+                .content(userContents)
                 .build();
 
-        // 4. 최종 요청 객체 완성
+        // 최종 요청 객체 완성
         AiRequestDto.Request requestBody = AiRequestDto.Request.builder()
                 .model("nvidia/nemotron-3-nano-omni-30b-a3b-reasoning")
                 .messages(List.of(systemMessage, userMessage))
@@ -93,7 +98,7 @@ public class AiService {
                 .retrieve()
                 .body(AiResponseDto.class);
 
-        // 2. content 텍스트 추출
+        // content 텍스트 추출
         String content = response.getChoices().get(0).getMessage().getContent();
 
         if (content.startsWith("```json")) {
