@@ -63,4 +63,14 @@ public class AiController {
         // 4. 저장된 결과를 클라이언트에게 반환
         return ResponseEntity.ok(savedItem);
     }
+
+    @GetMapping
+    public ResponseEntity<java.util.List<MaguItem>> getAllMagus() {
+        // DB에서 모든 데이터를 꺼내오되, ID 기준으로 내림차순(최신순) 정렬
+        java.util.List<MaguItem> allItems = maguItemRepository.findAll(
+                org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "id")
+        );
+        
+        return ResponseEntity.ok(allItems);
+    }
 }
