@@ -1,6 +1,9 @@
 package com.kimnayoung.magumagu.service;
 
-import com.kimnayoung.magumagu.dto.AiRequesetDto;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kimnayoung.magumagu.dto.AiParsedResultDto;
+import com.kimnayoung.magumagu.dto.AiRequestDto;
+import com.kimnayoung.magumagu.dto.AiResponseDto;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -11,14 +14,16 @@ import java.util.List;
 public class AiService {
     private final RestClient restClient;
     private final String apiKey;
+    private final ObjectMapper objectMapper;
 
     // 생성자를 통해 RestClient와 application.yml에 API 키를 주입받음
     public AiService(@Value("${ai.nvidia.api-key}") String apiKey) {
         this.restClient = RestClient.builder().baseUrl("https://integrate.api.nvidia.com/v1").build();
         this.apiKey = apiKey;
+        this.objectMapper = new ObjectMapper();
     }
 
-    public String testVisionApi() {
+    public AiParsedResultDto testVisionApi() {
         String systemPrompt = """
                 너는 사용자의 무질서한 텍스트 메모, 링크, 이미지를 완벽하게 분석하고 체계적으로 분류하는 서비스의 핵심 AI 비서야.
                 사용자가 데이터를 입력하면, 반드시 아래의 규칙을 준수하여 오직 JSON 형식으로만 응답해야 해. JSON 외에 어떠한 부가적인 설명이나 인사말도 절대 출력하지 마.
@@ -42,50 +47,65 @@ public class AiService {
                 }
                 """;
 
-        AiRequesetDto.Content systemContent = AiRequesetDto.Content.builder()
+        AiRequestDto.Content systemContent = AiRequestDto.Content.builder()
                 .type("text")
                 .text(systemPrompt)
                 .build();
 
-        AiRequesetDto.Message systemMessage = AiRequesetDto.Message.builder()
+        AiRequestDto.Message systemMessage = AiRequestDto.Message.builder()
                 .role("system")
                 .content(List.of(systemContent))
                 .build();
         
         // 1. DTO 조립: 텍스트 내용 세팅
-        AiRequesetDto.Content textContent = AiRequesetDto.Content.builder()
+        AiRequestDto.Content textContent = AiRequestDto.Content.builder()
                 .type("text")
                 .text("이 사진에 무엇이 있는지 간단히 한글로 설명해 줘.")
                 .build();
 
         // 2. DTO 조립: 이미지 URL 세팅
-        AiRequesetDto.Content imageContent = AiRequesetDto.Content.builder()
+        AiRequestDto.Content imageContent = AiRequestDto.Content.builder()
                 .type("image_url")
-                .image_url(AiRequesetDto.ImageUrl.builder()
+                .image_url(AiRequestDto.ImageUrl.builder()
                         .url("https://picsum.photos/id/237/400/300")
                         .build())
                 .build();
 
         // 3. 메시지 묶기
-        AiRequesetDto.Message userMessage = AiRequesetDto.Message.builder()
+        AiRequestDto.Message userMessage = AiRequestDto.Message.builder()
                 .role("user")
                 .content(List.of(textContent, imageContent))
                 .build();
 
         // 4. 최종 요청 객체 완성
-        AiRequesetDto.Request requestBody = AiRequesetDto.Request.builder()
+        AiRequestDto.Request requestBody = AiRequestDto.Request.builder()
                 .model("nvidia/nemotron-3-nano-omni-30b-a3b-reasoning")
                 .messages(List.of(systemMessage, userMessage))
                 .max_tokens(2048)
                 .build();
 
-        // 5. NVIDIA API로 발송 및 응답 반환
-        return restClient.post()
+        // API 발송 및 AiResponseDto로 1차 파싱
+        AiResponseDto response = restClient.post()
                 .uri("/chat/completions")
                 .header("Authorization", "Bearer " + apiKey)
                 .header("Accept", "application/json")
                 .body(requestBody)
                 .retrieve()
-                .body(String.class);
+                .body(AiResponseDto.class);
+
+        // 2. content 텍스트 추출
+        String content = response.getChoices().get(0).getMessage().getContent();
+
+        if (content.startsWith("```json")) {
+            content = content.substring(7, content.length() - 3).trim();
+        } else if (content.startsWith("```")) {
+            content = content.substring(3, content.length() - 3).trim();
+        }
+
+        try {
+            return objectMapper.readValue(content, AiParsedResultDto.class);
+        } catch (Exception e) {
+            throw new RuntimeException("AI 응답 파싱 실패: " + content, e);
+        }
     }
 }

@@ -1,5 +1,6 @@
 package com.kimnayoung.magumagu.controller;
 
+import com.kimnayoung.magumagu.dto.AiParsedResultDto;
 import com.kimnayoung.magumagu.service.AiService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -19,8 +20,8 @@ public class AiController {
      * GET http://localhost:8080/api/ai/test
      */
     @GetMapping(value = "/test", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<String> testVision() {
-        String response = aiService.testVisionApi();
+    public ResponseEntity<AiParsedResultDto> testVision() {
+        AiParsedResultDto response = aiService.testVisionApi();
         return ResponseEntity.ok(response);
     }
 }

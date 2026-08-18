@@ -5,7 +5,7 @@ import lombok.Builder;
 import lombok.Getter;
 import java.util.List;
 
-public class AiRequesetDto {
+public class AiRequestDto {
     @Getter
     @Builder
     public static class Request {
