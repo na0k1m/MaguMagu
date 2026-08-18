@@ -1,6 +1,6 @@
 package com.kimnayoung.magumagu.controller;
 
-import com.kimnayoung.magumagu.service.AIService;
+import com.kimnayoung.magumagu.service.AiService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -11,8 +11,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/ai")
 @RequiredArgsConstructor
-public class AIController {
-    private final AIService aiService;
+public class AiController {
+    private final AiService aiService;
 
     /**
      * AI Vision API 연동 테스트 엔드포인트
