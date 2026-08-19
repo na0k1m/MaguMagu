@@ -21,7 +21,7 @@ public class AiController {
     private final AiService aiService;
     private final MaguItemRepository maguItemRepository;
 
-    @PostMapping
+    @PostMapping(consumes = "multipart/form-data")
     public ResponseEntity<MaguItem> createMagu(
             @RequestParam(value = "text", required = false) String text, // 텍스트 메모
             @RequestPart(value = "image", required = false) MultipartFile imageFile) {
