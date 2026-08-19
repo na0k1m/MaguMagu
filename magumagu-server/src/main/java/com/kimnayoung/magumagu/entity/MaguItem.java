@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
@@ -14,6 +16,10 @@ public class MaguItem {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id; // DB 자동 생성 번호 (Primary Key)
+
+    @CreationTimestamp
+    @Column(updatable = false) // 한 번 생성된 날짜는 수정되지 않도록
+    private LocalDateTime createdAt;
 
     private String category; // 일정, 정보, 아이디어 등
     private String format;   // text, image, link
