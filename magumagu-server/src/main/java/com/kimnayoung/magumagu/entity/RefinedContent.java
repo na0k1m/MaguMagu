@@ -40,4 +40,8 @@ public class RefinedContent {
         this.refinedText = refinedText;
         this.category = category;
     }
+
+    @OneToMany(mappedBy = "refinedContent")
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties("refinedContent") // 무한루프 방지
+    private java.util.List<ContentTagMap> tags = new java.util.ArrayList<>();
 }

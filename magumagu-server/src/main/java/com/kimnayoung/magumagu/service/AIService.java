@@ -4,8 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kimnayoung.magumagu.dto.AiParsedResultDto;
 import com.kimnayoung.magumagu.dto.AiRequestDto;
 import com.kimnayoung.magumagu.dto.AiResponseDto;
+import com.kimnayoung.magumagu.entity.*;
+import com.kimnayoung.magumagu.repository.*;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
@@ -16,14 +20,26 @@ public class AiService {
     private final String apiKey;
     private final ObjectMapper objectMapper;
 
+    private final CategoryRepository categoryRepository;
+    private final TagRepository tagRepository;
+    private final RefinedContentRepository refinedContentRepository;
+    private final ContentTagMapRepository contentTagMapRepository;
+
     // 생성자를 통해 RestClient와 application.yml에 API 키를 주입받음
-    public AiService(@Value("${ai.nvidia.api-key}") String apiKey) {
+    public AiService(@Value("${ai.nvidia.api-key}") String apiKey,
+                     CategoryRepository categoryRepository,
+                     TagRepository tagRepository,
+                     RefinedContentRepository refinedContentRepository,
+                     ContentTagMapRepository contentTagMapRepository) {
         this.restClient = RestClient.builder().baseUrl("https://integrate.api.nvidia.com/v1").build();
         this.apiKey = apiKey;
         this.objectMapper = new ObjectMapper();
+        this.categoryRepository = categoryRepository;
+        this.tagRepository = tagRepository;
+        this.refinedContentRepository = refinedContentRepository;
+        this.contentTagMapRepository = contentTagMapRepository;
     }
 
-//     public AiParsedResultDto testVisionApi() {
     public AiParsedResultDto analyzeData(String userText, String imageUrl) {
         String systemPrompt = """
                 너는 사용자의 무질서한 텍스트 메모, 링크, 이미지를 완벽하게 분석하고 체계적으로 분류하는 서비스의 핵심 AI 비서야.
@@ -36,7 +52,8 @@ public class AiService {
                    ["text", "image", "link"]
                 3. tags: 나중에 사용자가 쉽게 검색할 수 있도록 핵심 키워드를 3~5개의 배열(Array) 형태로 추출해.
                 4. summary: 입력된 내용의 핵심을 파악하여 20자 이내의 직관적인 한 줄 제목을 작성해.
-                5. extracted_text: 이미지에 텍스트가 포함되어 있다면 빠짐없이 추출해서 적고, 단순 텍스트 메모라면 맞춤법을 교정하여 저장하고, 링크라면 URL 주소를 그대로 적어. (해당하는 내용이 없다면 빈 문자열 ""을 반환해.)
+                5. extracted_text: 입력된 데이터(이미지/텍스트)의 내용을 단순히 옮겨 적지 마. 
+                반드시 핵심 내용만 파악하여, 불필요한 서술어는 모두 제거하고 [개조식 요약] 형태로 완벽하게 정제해서 작성해.
                 
                 [응답 형식 (JSON)]
                 {
@@ -112,5 +129,40 @@ public class AiService {
         } catch (Exception e) {
             throw new RuntimeException("AI 응답 파싱 실패: " + content, e);
         }
+    }
+
+    // AI 분석 결과를 4개의 DB 테이블에 정돈해서 저장하는 메서드
+    @Transactional
+    public RefinedContent saveRefinedData(String originalText, String parsedCategory, String parsedRefinedText, List<String> parsedTags) {
+        
+        // 1. 카테고리 처리
+        Category category = categoryRepository.findByName(parsedCategory)
+                .orElseGet(() -> categoryRepository.save(Category.builder().name(parsedCategory).build()));
+
+        // 2. 메인 기록 저장
+        RefinedContent content = RefinedContent.builder()
+                .originalContent(originalText)
+                .refinedText(parsedRefinedText)
+                .category(category)
+                .build();
+        refinedContentRepository.save(content);
+
+        // 3. 태그 맵핑 처리
+        // 만약 태그가 null이라면 빈 리스트로 처리해서 에러를 방지
+        if (parsedTags != null) {
+            for (String tagName : parsedTags) {
+                Tag tag = tagRepository.findByName(tagName)
+                        .orElseGet(() -> tagRepository.save(Tag.builder().name(tagName).build()));
+
+                ContentTagMap tagMap = ContentTagMap.builder()
+                        .refinedContent(content)
+                        .tag(tag)
+                        .build();
+                contentTagMapRepository.save(tagMap);
+                content.getTags().add(tagMap);
+            }
+        }
+
+        return content;
     }
 }

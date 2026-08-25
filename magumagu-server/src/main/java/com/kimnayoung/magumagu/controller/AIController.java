@@ -1,76 +1,58 @@
 package com.kimnayoung.magumagu.controller;
 
 import com.kimnayoung.magumagu.dto.AiParsedResultDto;
-import com.kimnayoung.magumagu.dto.MaguRequestDto;
-import com.kimnayoung.magumagu.entity.MaguItem;
-import com.kimnayoung.magumagu.repository.MaguItemRepository;
+import com.kimnayoung.magumagu.entity.RefinedContent;
 import com.kimnayoung.magumagu.service.AiService;
-import lombok.RequiredArgsConstructor;
-
-import java.util.Base64;
-
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/magu")
-@RequiredArgsConstructor
 public class AiController {
     private final AiService aiService;
-    private final MaguItemRepository maguItemRepository;
 
-    @PostMapping(consumes = "multipart/form-data")
-    public ResponseEntity<MaguItem> createMagu(
-            @RequestParam(value = "text", required = false) String text, // 텍스트 메모
-            @RequestPart(value = "image", required = false) MultipartFile imageFile) {
-        
-        String imageUrlForAi = "";
-        String originalFileName = "";
-
-        try {
-            // 1. 사진 파일이 들어왔다면? AI가 읽을 수 있는 Base64 텍스트로 변환!
-            if (imageFile != null && !imageFile.isEmpty()) {
-                originalFileName = imageFile.getOriginalFilename();
-                String contentType = imageFile.getContentType(); 
-                byte[] imageBytes = imageFile.getBytes(); 
-                
-                String base64Data = Base64.getEncoder().encodeToString(imageBytes);
-                imageUrlForAi = "data:" + contentType + ";base64," + base64Data;
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("이미지 변환 중 오류가 발생했습니다.", e);
-        }
-
-        // 1. AI 서비스 호출하여 분석 요청
-        AiParsedResultDto aiResult = aiService.analyzeData(text, imageUrlForAi);
-
-        // 2. 분석 결과를 바탕으로 DB에 저장할 Entity 조립
-        MaguItem newItem = MaguItem.builder()
-                .category(aiResult.getCategory())
-                .format(aiResult.getFormat())
-                .tags(aiResult.getTags())
-                .summary(aiResult.getSummary())
-                .extractedText(aiResult.getExtracted_text())
-                .originalText(text)
-                .originalImageUrl(originalFileName)
-                .build();
-
-        // 3. DB에 저장
-        MaguItem savedItem = maguItemRepository.save(newItem);
-
-        // 4. 저장된 결과를 클라이언트에게 반환
-        return ResponseEntity.ok(savedItem);
+    // 생성자를 통해 AiService 주입
+    public AiController(AiService aiService) {
+        this.aiService = aiService;
     }
 
-    @GetMapping
-    public ResponseEntity<java.util.List<MaguItem>> getAllMagus() {
-        // DB에서 모든 데이터를 꺼내오되, ID 기준으로 내림차순(최신순) 정렬
-        java.util.List<MaguItem> allItems = maguItemRepository.findAll(
-                org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "id")
-        );
+    @PostMapping(consumes = "multipart/form-data")
+    public ResponseEntity<?> createMagu(
+            @RequestParam(value = "text", required = false) String text,
+            @RequestParam(value = "image", required = false) MultipartFile image) {
         
-        return ResponseEntity.ok(allItems);
+        try {
+            // 1. 입력 데이터 정리
+            // 만약 텍스트를 안 보냈다면 에러가 나지 않도록 빈 문자열로 처리
+            String originalText = (text != null) ? text : "";
+            
+            String imageUrl = "";
+            if (image != null && !image.isEmpty()) {
+                // 이미지를 Base64 문자열로 인코딩합니다.
+                String base64Image = java.util.Base64.getEncoder().encodeToString(image.getBytes());
+                // 파일의 타입(예: image/png)을 가져와서 AI가 인식할 수 있는 포맷으로 조립합니다.
+                String mimeType = image.getContentType();
+                imageUrl = "data:" + mimeType + ";base64," + base64Image;
+            }
+
+            // 2. AI에게 데이터 분석 요청 (첫 번째 무기 발사!)
+            AiParsedResultDto parsedResult = aiService.analyzeData(originalText, imageUrl);
+
+            // 3. 분석된 결과를 DB에 체계적으로 저장 (두 번째 무기 발사!)
+            RefinedContent savedContent = aiService.saveRefinedData(
+                    originalText, 
+                    parsedResult.getCategory(), 
+                    parsedResult.getExtracted_text(), // AI가 추출해 준 텍스트/결과물
+                    parsedResult.getTags()
+            );
+
+            // 4. 저장 완료된 결과를 화면(Swagger나 앱)에 보여줍니다.
+            return ResponseEntity.ok(savedContent);
+
+        } catch (Exception e) {
+            // 에러가 나면 무슨 에러인지 친절하게 알려줍니다.
+            return ResponseEntity.internalServerError().body("저장 중 에러 발생: " + e.getMessage());
+        }
     }
 }
