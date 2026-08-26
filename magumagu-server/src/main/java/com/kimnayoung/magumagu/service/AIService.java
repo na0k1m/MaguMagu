@@ -50,10 +50,10 @@ public class AiService {
                    ["일정", "정보", "아이디어", "쇼핑", "추억", "기타"]
                 2. format: 입력된 데이터의 형태를 파악하여 다음 3가지 중 하나를 선택해.
                    ["text", "image", "link"]
-                3. tags: 나중에 사용자가 쉽게 검색할 수 있도록 핵심 키워드를 3~5개의 배열(Array) 형태로 추출해.
-                4. summary: 입력된 내용의 핵심을 파악하여 20자 이내의 직관적인 한 줄 제목을 작성해.
-                5. extracted_text: 입력된 데이터(이미지/텍스트)의 내용을 단순히 옮겨 적지 마. 
-                반드시 핵심 내용만 파악하여, 불필요한 서술어는 모두 제거하고 [개조식 요약] 형태로 완벽하게 정제해서 작성해.
+                3. tags: 나중에 사용자가 쉽게 검색할 수 있도록 핵심 키워드를 1~3개의 배열(Array) 형태로 추출해.
+                4. summary: 입력된 내용의 핵심을 파악하여 15자 이내의 직관적인 한 줄 제목을 작성해.
+                5. extracted_text: 이미지에 텍스트가 포함되어 있다면 빠짐없이 추출해서 적고,
+                    단순 텍스트 메모라면 맞춤법을 교정하여 저장하고, 링크라면 URL 주소를 그대로 적어. (해당하는 내용이 없다면 빈 문자열 ""을 반환해.)
                 
                 [응답 형식 (JSON)]
                 {
@@ -133,24 +133,26 @@ public class AiService {
 
     // AI 분석 결과를 4개의 DB 테이블에 정돈해서 저장하는 메서드
     @Transactional
-    public RefinedContent saveRefinedData(String originalText, String parsedCategory, String parsedRefinedText, List<String> parsedTags) {
+    public RefinedContent saveRefinedData(String originalText, AiParsedResultDto parsedResult) {
         
         // 1. 카테고리 처리
-        Category category = categoryRepository.findByName(parsedCategory)
-                .orElseGet(() -> categoryRepository.save(Category.builder().name(parsedCategory).build()));
+        Category category = categoryRepository.findByName(parsedResult.getCategory())
+                .orElseGet(() -> categoryRepository.save(Category.builder().name(parsedResult.getCategory()).build()));
 
         // 2. 메인 기록 저장
         RefinedContent content = RefinedContent.builder()
                 .originalContent(originalText)
-                .refinedText(parsedRefinedText)
+                .refinedText(parsedResult.getExtracted_text())
                 .category(category)
+                .format(parsedResult.getFormat())
+                .summary(parsedResult.getSummary())
                 .build();
         refinedContentRepository.save(content);
 
         // 3. 태그 맵핑 처리
         // 만약 태그가 null이라면 빈 리스트로 처리해서 에러를 방지
-        if (parsedTags != null) {
-            for (String tagName : parsedTags) {
+        if (parsedResult.getTags() != null) {
+            for (String tagName : parsedResult.getTags()) {
                 Tag tag = tagRepository.findByName(tagName)
                         .orElseGet(() -> tagRepository.save(Tag.builder().name(tagName).build()));
 

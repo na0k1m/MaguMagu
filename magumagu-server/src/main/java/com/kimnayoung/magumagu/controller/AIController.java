@@ -40,12 +40,7 @@ public class AiController {
             AiParsedResultDto parsedResult = aiService.analyzeData(originalText, imageUrl);
 
             // 3. 분석된 결과를 DB에 체계적으로 저장 (두 번째 무기 발사!)
-            RefinedContent savedContent = aiService.saveRefinedData(
-                    originalText, 
-                    parsedResult.getCategory(), 
-                    parsedResult.getExtracted_text(), // AI가 추출해 준 텍스트/결과물
-                    parsedResult.getTags()
-            );
+            RefinedContent savedContent = aiService.saveRefinedData(originalText, parsedResult);
 
             // 4. 저장 완료된 결과를 화면(Swagger나 앱)에 보여줍니다.
             return ResponseEntity.ok(savedContent);

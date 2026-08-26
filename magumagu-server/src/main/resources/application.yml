@@ -2,6 +2,22 @@ spring:
   application:
     name: magumagu
 
+  datasource:
+    url: jdbc:mysql://localhost:3306/magumagu?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: root
+    password: 1234
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      # 서버를 켤 때마다 우리가 만든 @Entity 구조대로 DB 테이블을 생성/수정
+      ddl-auto: update
+    # VS Code 터미널에 DB로 날아가는 SQL 쿼리문을 보여줌
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
 ai:
   nvidia:
     api-key: ${NVIDIA_API_KEY}

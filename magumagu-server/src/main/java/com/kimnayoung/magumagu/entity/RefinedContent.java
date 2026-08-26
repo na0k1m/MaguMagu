@@ -24,10 +24,17 @@ public class RefinedContent {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String refinedText;
 
+    // 요약 제목용 필드 추가
+    @Column(length = 100)
+    private String summary;
+
     // 생성 일시는 DB가 알아서 찍어주도록 설정
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(length = 20)
+    private String format;
 
     // 여러 개의 기록(N)은 하나의 카테고리(1)에 속한다
     @ManyToOne(fetch = FetchType.LAZY) 
@@ -35,9 +42,11 @@ public class RefinedContent {
     private Category category;
 
     @Builder
-    public RefinedContent(String originalContent, String refinedText, Category category) {
+    public RefinedContent(String originalContent, String refinedText, String format, String summary, Category category) {
         this.originalContent = originalContent;
         this.refinedText = refinedText;
+        this.format = format;
+        this.summary = summary;
         this.category = category;
     }
 
